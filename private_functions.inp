@@ -1,0 +1,21 @@
+# private functions
+
+function scalar rs (series X)
+    # subtract the mean
+    series Y = X - mean(X)
+    # cumulative series
+    series Z = cum(Y)
+    # calculate range
+    range = max(Z) - min(Z)
+    # calculate SD, remove Bessel's correction in the sd-function
+    s = sd(X) * sqrt((nobs(X)-1)/nobs(X))
+    r_s = (range / s)
+    return r_s
+end function
+
+function scalar df (series X)
+    # computes a samples's (squared) residuals about a (linear) trend
+    ols X time 0 --quiet
+    sumsq = $ess / nobs(X)
+    return sumsq
+end function

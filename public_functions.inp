@@ -1,0 +1,108 @@
+# public functions
+
+function scalar gen_hurst (series X,
+                           int method[0:1:0] "estimation method" {"rs", "dfa"},
+                           scalar r[1:2:2] "successive box size ratio",
+                           int min_size[3::8] "Minimum box size",
+                           bool suppress_printout[0] "suppress output",
+                           matrix *lfl[null] "to capture log_fl")
+    # old:
+    # string est_method[null] "estimation method, possible values: 'rs' and 'dfa' ",
+    set verbose off
+    # for dfa (method == 1): create a profile
+    series X = (method == 0) ? X : cum(X)
+    # Check the series for sufficient size
+    if nobs(X) < 128
+        funcerr "Sample is too small for analysis"
+    endif
+    # Trim missing values at the start and the end of the sample, check for
+    # missings in between
+    smpl --contiguous X
+    # Store index of the first observation in the sample
+    start_obs = $t1
+    # Store index of the last observation in the sample
+    end_obs = $t2
+    # Stores the total number of observations, which is the size of the first box
+    n = nobs(X)
+    # matrix to store the fluctuation measure for each box size
+    matrix fl_matrix = {}
+    # matrix to store box sizes
+    matrix n_size = {}
+    # generate reverse time series
+    matrix z = X
+    series rev_X = mreverse(z)
+    # loop through the sample while n < number of observations in the sample
+    loop while n > (min_size-1) --quiet
+        # set a helper variable to set the start of the first box
+        i = start_obs
+        # set a helper variable to count the number of regressions performed
+        j = 0
+        # store the sum the fluctuation measures for current box size
+        sum_fl = 0
+        # loop through the whole sample in boxes of size n
+        loop while i <= (end_obs - n + 1) --quiet
+            # set the box of length n, starting at i
+            smpl i (i + n - 1)
+            if method == 0
+                #Compute the rescaled range for both time series
+                sum_fl += rs(X)
+                sum_fl += rs(rev_X)
+            else
+                #Compute detrended fluctuation measure for both ts
+                sum_fl += df(X)
+                sum_fl += df(rev_X)
+            endif
+            i += n
+            j += 2
+        endloop
+        # calculate the mean fluctuation measure for the current n,
+        # append it to the fl_matrix
+        avg_fl = (method == 0) ? (sum_fl / j) : sqrt(sum_fl / j)
+        fl_matrix |= avg_fl
+        # append the matrix storing the successive box sizes by the current n
+        n_size |= n
+        # Adjust the box size for the next iteration, according to the ratio
+        # specified by r
+        n = (n == int(n/r)) ? n-1 : int(n/r)
+    endloop
+    # create the matrix containing the fluctuation measure
+    # corresponding to each box size n
+    matrix fl_n = n_size ~ fl_matrix
+    matrix logfl_n = log2(fl_n)    # take the base 2 logarithm of rs_n
+    # perform mols regression to obtain the hurst exponent
+    matrix c = ones(rows(logfl_n), 1)
+    # Create matrix for storing the variance
+    matrix V = {}
+    # perform the mols regression
+    matrix regr = mols(logfl_n[,2], c~logfl_n[,1], null, &V)
+    # print output tables, in case output is not suppressed
+    if suppress_printout == 0
+        # display a log-log graph,
+        # print output table, containing the fluctuation for each box size n,
+        # as well as their base 2 logarithm and the estimated H coeff.
+        if method == 0
+            gnuplot 2 1 --output=display --fit=linear --matrix=logfl_n {set xlabel "log(sample size)"; set ylabel "log(RS)"; set title "(alternative) Rescaled-range plot";}
+            printf "Rescaled range figures\n"
+            printf "(logs are to base 2)\n\n"
+            printf "%-6.6s\t%-10.6s\t%-6.6s\t\t%-6.6s\n\n", "n", "RS_avg", "log(n)", "log_RS"
+        else
+            gnuplot 2 1 --output=display --fit=linear --matrix=logfl_n {set xlabel "log(sample size)"; set ylabel "log(F)"; set title "Detrended Fluctuation plot";}
+            printf "Detrended fluctuation figures\n"
+            printf "(logs are to base 2)\n\n"
+            printf "%-6.6s\t%-10.6s\t%-6.6s\t\t%-6.6s\n\n", "n", "F", "log(n)", "log_F"
+        endif
+        loop i = 1..rows(logfl_n) --quiet
+            printf "%-6.6g\t%-10.6g\t%-6.6g\t\t%-6.6g\n", fl_n[$i,1], fl_n[$i,2], logfl_n[$i,1], logfl_n[$i,2]
+        endloop
+        printf "\nRegression results (n = %.6g)\n\n", rows(logfl_n)
+        printf "%9.9s\t%s\t\t%s\n", " ", "coeff", "std. error"
+        printf "%s\t%-9.6g\t%-9.6g\n", "Intercept", regr[1,1], sqrt(V[1,1])
+        printf "%s\t\t%-9.6g\t%-9.6g\n\n", "Slope", regr[2,1], sqrt(V[2,2])
+        printf "Estimated Hurst exponent = %.8g\n\n", regr[2,1]
+    endif
+    #  return the log2 fluctuation matrix
+    if exists(lfl)
+        lfl = logfl_n
+    endif
+    return regr[2,1]  #  was: logfl_n
+end function

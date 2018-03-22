@@ -1,0 +1,66 @@
+Package: gen_hurst 0.1 (2017-12-05)
+Author: Joachim Reinhardt
+Email: joachim.reinhardt@fu-berlin.de
+Required gretl version: 2016a
+Data requirement: Time-series data
+Description: generalized Hurst exponent estimation
+
+Help text:
+
+
+The public function gen_hurst() provides a generalization of gretl's built-in hurst
+command to estimate the long-range dependence parameter of a time series.
+With default parameters, the function works like the built-in hurst command, with
+several adjustments possible.
+Also refer to the help text for the built-in hurst command.
+
+--------------------
+The function takes the following arguments:
+(1) series X: required argument, the time series to be analyzed
+(2) int method: optional, the method of estimation. The default is 0 (=R/S
+Analysis). Set to 1 for DFA (Detrended Fluctuation Analysis).
+(3) scalar r: optional, determines the ratio of successive sub-sample sizes.
+Default
+is 2 (the size of the first sub-sample is twice the size of the next, and so on).
+Set to any number between 1 and 2 in order to adjust successive sample size ratios.
+(4) int min_size: optional, sets the size of the smallest sub-sample. Default is 8,
+with a minimum value of 3.
+(5) bool suppress_printout: optional, default is 0 (=no). Set to 1 in order to just
+obtain the return matrix, suppressing printout and plot.
+(6) matrix *lfl[null]: optional, acts as a placeholder to store the log-log matrix
+of the fluctuation measures (R/S or Detrended Fluctuation) and respective sample
+sizes. This matrix can be used for further analysis, e.g. estimation of crossover
+phenomena.
+
+Per default, the function returns an estimate for the Hurst exponent.
+As for the built-in hurst command, a minimum of 128 observations is required.
+The gen_hurst function applies the subsampling procedure twice for each subsample
+size, starting once from the beginning and once from the end of the whole sample.
+This is done in order to account for "residual” observations at the end of the
+sample which might be cut off in the subsampling procedure. As this is not done in
+the original hurst command, results may differ slightly from those obtained by
+built-in command.
+
+
+--------------------
+DFA (Detrended Fluctuation Analysis) is a method for estimating the Hurst exponent
+that works similar to R/S analysis, but involves the elimination of local trends in
+each sub-sample. Here, a linear (OLS) detrending method is employed. For a good
+exposition on the methodology, see
+Kantelhardt, J.W., Koscielny-Bunde, E., Rego, H.H., Havlin, S., & Bunde, A. 2001.
+Detecting long-range correlations with detrended fluctuation analysis. Physica A:
+Statistical Mechanics and its Applications, 295(3), 441-454.
+
+In contrast to estimation by R/S, DFA can yield estimates of the Hurst exponent
+greater than 1. If the H of a time series estimated by R/S is close to 1 and the
+DFA estimate is larger than one, differencing the data will yield consistent
+estimates for both methods. See sample script for an example.
+
+--------------------
+
+Any reports concerning bugs or suggestions on additional features are welcome and
+encouraged.
+Extensive support from Dr. Sven Schreiber is greatfully acknowledged.
+--------------------
+Changelog:
+0.1, December 2017: initial release
